@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataForge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <style>
+        /* ─── DARK ── */
+        :root {
+            --bg:      #050505;
+            --surface: #0A0A0B;
+            --border:  #1A1A1C;
+            --accent:  #2E5BFF;
+            --glow:    rgba(46,91,255,0.15);
+            --txt:     #ffffff;
+            --txt-m:   #666666;
+            --card:    rgba(10,10,11,0.7);
+            --nav:     rgba(5,5,5,0.88);
+        }
+        /* ─── LIGHT ── */
+        html.light {
+    --bg:        #e9e2e2;      /* main background */
+    --surface:   #e4dfdf;      /* cards / panels */
+    --border:    #e6e8ef;      /* subtle separators */
+    --accent:    #08227e;      /* primary action */
+    --accent-soft:#eef2ff;     /* soft hover bg */
+    --glow:      rgba(27, 68, 215, 0.12);
+
+    --txt:       #111827;      /* primary text */
+    --txt-m:     #4b5563;      /* secondary text */
+    --txt-f:     #6b7280;      /* faint text */
+
+    --card:      #efeaeae6;
+    --nav:       rgba(255,255,255,0.85);
+}
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--txt);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .noise {
+            position: fixed; inset: 0; pointer-events: none; opacity: .035; z-index: 9999;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        html.light .noise { opacity: .012; }
+
+        .mesh {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at 0% 0%, var(--glow) 0%, transparent 45%),
+                        radial-gradient(circle at 100% 100%, rgba(20,10,50,.5) 0%, transparent 40%);
+        }
+        html.light .mesh {
+            background: radial-gradient(circle at 0% 0%, var(--glow) 0%, transparent 45%),
+                        radial-gradient(circle at 100% 100%, rgba(200,210,255,.3) 0%, transparent 40%);
+        }
+
+        .gc {
+            background: var(--card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            transition: all 0.35s cubic-bezier(.23,1,.32,1);
+        }
+        .gc:hover { border-color: var(--accent); box-shadow: 0 0 28px var(--glow); }
+
+        /* dropzone rotating border */
+        .dz-wrap { position: relative; padding: 2px; border-radius: 1.4rem; background: var(--border); overflow: hidden; }
+        .dz-wrap::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:conic-gradient(from 0deg, transparent, transparent, var(--accent), transparent, transparent); animation:rot 6s linear infinite; opacity:0; transition:opacity .5s; }
+        .dz-wrap.dragging::before { opacity:1; }
+        @keyframes rot { 100%{ transform:rotate(360deg); } }
+
+        /* scrollbars */
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:var(--bg); }
+        ::-webkit-scrollbar-thumb { background:var(--border); border-radius:10px; }
+
+        .btn-mag { transition:transform .2s cubic-bezier(.175,.885,.32,1.275); }
+        .btn-mag:hover { transform:scale(1.02) translateY(-2px); }
+        .btn-mag:active { transform:scale(0.98); }
+
+        .pulse-dot { width:8px; height:8px; border-radius:50%; background:#1e9902; box-shadow:0 0 0 0 rgba(16,185,129,.4); animation:pd 2s infinite; }
+        @keyframes pd { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.7)} 70%{box-shadow:0 0 0 8px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+
+        [x-cloak] { display:none !important; }
+
+        .ibt { width:32px; height:32px; border-radius:.45rem; border:1px solid var(--border); background:transparent; cursor:pointer; color:var(--txt-m); display:flex; align-items:center; justify-content:center; transition:border-color .15s, color .15s; flex-shrink:0; }
+        .ibt:hover { border-color:var(--accent); color:var(--txt); }
+
+        /* stat grid in uploaded state */
+        .stat-box { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:.75rem; padding:.75rem; text-align:center; }
+        html.light .stat-box { background:rgba(0,0,0,.04); border-color:rgba(0,0,0,.08); }
+    </style>
+</head>
+
+<body x-data="uploadApp()" x-init="initTheme()" x-cloak>
+    <div class="noise"></div>
+    <div class="mesh"></div>
+
+    <!-- ═══════════ HEADER ═══ -->
+    <header class="px-5 md:px-8 py-4 flex justify-between items-center border-b sticky top-0 z-50 backdrop-blur-md" style="background:var(--nav); border-color:var(--border)">
+        <div class="flex items-center gap-3">
+            <div class="w-7 h-7 flex items-center justify-center rounded-sm flex-shrink-0" style="background:var(--txt)">
+                <div class="w-3.5 h-3.5 rotate-45" style="background:var(--bg)"></div>
+            </div>
+            <span class="font-bold text-sm tracking-widest uppercase" style="color:var(--txt)">DataForge</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="hidden md:flex items-center gap-2">
+                <div class="pulse-dot"></div>
+                <span class="text-[10px] font-bold text-[#1e9902] tracking-tighter uppercase">Engine Live</span>
+            </div>
+            <!-- Theme toggle -->
+            <button @click="toggleTheme()" class="ibt" title="Toggle theme">
+                <svg x-show="darkMode" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg x-show="!darkMode" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══════════ MAIN ═══ -->
+    <main class="flex-grow flex flex-col items-center justify-center px-5 py-10 md:py-14">
+        <div class="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+
+            <!-- Left: Value prop -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="space-y-4">
+                    <span class="inline-block px-3 py-1 border text-[10px] font-bold tracking-[.2em] uppercase rounded-full" style="background:var(--surface); border-color:var(--border); color:var(--accent)">Production-Grade Intelligence</span>
+                    <h1 class="font-black uppercase leading-[0.92] tracking-tight" style="font-size:clamp(2.5rem,6vw,4.5rem); background:linear-gradient(135deg,var(--txt) 0%,var(--txt-m) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">
+                        Turn Chaos<br/>into<br/><span style="-webkit-text-fill-color:var(--txt)">Clarity.</span>
+                    </h1>
+                </div>
+                <p class="text-base leading-relaxed font-light max-w-md" style="color:var(--txt-m)">Upload your CSV and let us handle the architecture. Cleaning, Profiling, and AutoML in one unified pipeline.</p>
+
+                <!-- Feature pills -->
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="feat in ['Auto Cleaning','EDA Profiling','AutoML FLAML','Gemini AI','Model Export']" :key="feat">
+                        <span class="text-[10px] font-bold px-3 py-1 rounded-full border" style="border-color:var(--border); color:var(--txt-m); background:var(--surface)" x-text="feat"></span>
+                    </template>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="flex -space-x-2.5">
+                        <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-bold" style="border-color:var(--bg); background:#374151">G</div>
+                        <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-bold" style="border-color:var(--bg); background:#1f2937">F</div>
+                    </div>
+                    <span class="text-[10px] font-medium uppercase tracking-widest" style="color:var(--txt-m)">Powered by Gemini & FLAML</span>
+                </div>
+            </div>
+
+            <!-- Right: Dropzone -->
+            <div class="lg:col-span-7">
+                <div class="dz-wrap" :class="isDragging ? 'dragging' : ''"
+                     @dragover.prevent="isDragging = true"
+                     @dragleave.prevent="isDragging = false"
+                     @drop.prevent="handleDrop($event)">
+
+                    <div class="gc rounded-[1.3rem] p-8 md:p-10 flex flex-col items-center justify-center text-center relative z-10" style="min-height:380px">
+
+                        <!-- Error -->
+                        <template x-if="errorMsg">
+                            <div class="absolute top-4 left-4 right-4 text-red-400 text-xs font-mono px-4 py-3 rounded-xl" style="background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.25)" x-text="errorMsg"></div>
+                        </template>
+
+                        <!-- Uploading -->
+                        <template x-if="isUploading">
+                            <div class="space-y-5">
+                                <div class="w-14 h-14 border-2 border-t-transparent rounded-full animate-spin mx-auto" style="border-color:var(--accent); border-top-color:transparent"></div>
+                                <div>
+                                    <p class="font-bold text-lg" style="color:var(--txt)">Ingesting dataset…</p>
+                                    <p class="text-sm mt-1" style="color:var(--txt-m)" x-text="fileName"></p>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Idle drop zone -->
+                        <template x-if="!fileUploaded && !isUploading">
+                            <div class="space-y-7 w-full">
+                                <input type="file" accept=".csv" x-ref="fileInput" class="hidden" @change="handleFileSelect($event)">
+
+                                <div class="relative inline-block cursor-pointer" @click="$refs.fileInput.click()">
+                                    <div class="w-20 h-20 border rounded-2xl flex items-center justify-center transform -rotate-6 hover:rotate-0 transition-transform duration-500 mx-auto" style="border-color:var(--border); background:var(--surface)">
+                                        <svg class="w-9 h-9" style="color:var(--accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path></svg>
+                                    </div>
+                                    <div class="absolute -bottom-2 -right-2 w-10 h-10 border rounded-xl flex items-center justify-center transform rotate-12" style="border-color:var(--border); background:var(--bg)">
+                                        <svg class="w-4 h-4" style="color:var(--txt)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <h3 class="text-xl font-bold tracking-tight" style="color:var(--txt)">Drop the Chaos</h3>
+                                    <p class="text-sm" style="color:var(--txt-m)">Drag your CSV here or <span class="underline cursor-pointer" style="color:var(--accent)" @click="$refs.fileInput.click()">browse files</span></p>
+                                    <p class="text-xs mt-1" style="color:var(--txt-m); opacity:.5">Max 200 MB · CSV only</p>
+                                </div>
+
+                                <div class="flex items-center justify-center gap-5 pt-4 border-t" style="border-color:var(--border)">
+                                    <div class="flex items-center gap-1.5 opacity-50">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest">Auto-Cleaning</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 opacity-50">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest">AI Profiling</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 opacity-50">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest">AutoML</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Uploaded ✓ -->
+                        <template x-if="fileUploaded && !isUploading">
+                            <div class="w-full space-y-6">
+                                <!-- File row -->
+                                <div class="flex items-center justify-between w-full p-5 rounded-2xl" style="background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1)">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-11 h-11 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style="background:var(--accent)">CSV</div>
+                                        <div class="text-left min-w-0">
+                                            <p class="font-bold truncate max-w-[180px]" style="color:var(--txt)" x-text="fileName"></p>
+                                            <p class="text-[10px] font-bold uppercase tracking-widest" style="color:var(--txt-m)" x-text="profile ? profile.rows.toLocaleString() + ' rows · ' + profile.cols + ' cols' : 'Ready for analysis'"></p>
+                                        </div>
+                                    </div>
+                                    <button @click="reset()" style="color:var(--txt-m)" class="hover:opacity-70 transition-opacity flex-shrink-0 ml-2">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Stats -->
+                                <template x-if="profile">
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <div class="stat-box">
+                                            <p class="text-[8px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">Rows</p>
+                                            <p class="text-lg font-black tracking-tighter mt-0.5" style="color:var(--txt)" x-text="profile.rows.toLocaleString()"></p>
+                                        </div>
+                                        <div class="stat-box">
+                                            <p class="text-[8px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">Cols</p>
+                                            <p class="text-lg font-black tracking-tighter mt-0.5" style="color:var(--txt)" x-text="profile.cols"></p>
+                                        </div>
+                                        <div class="stat-box">
+                                            <p class="text-[8px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">Numeric</p>
+                                            <p class="text-lg font-black tracking-tighter mt-0.5" style="color:var(--txt)" x-text="profile.numeric"></p>
+                                        </div>
+                                        <div class="stat-box">
+                                            <p class="text-[8px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">Missing</p>
+                                            <p class="text-lg font-black tracking-tighter mt-0.5" style="color:var(--txt)" x-text="profile.missing_pct + '%'"></p>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- CTAs -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <button @click="goToWorkspace()" class="btn-mag flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-white tracking-tight" style="background:var(--accent)">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                                        LAUNCH WORKSPACE
+                                    </button>
+                                    <button @click="reset()" class="btn-mag border py-3.5 rounded-xl font-bold tracking-tight" style="border-color:var(--border); background:var(--surface); color:var(--txt)">
+                                        CHANGE FILE
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+
+                    </div>
+                </div>
+
+                <!-- "Sample datasets" placeholder -->
+                <div class="mt-8 space-y-3">
+                    <h4 class="text-[10px] font-bold uppercase tracking-[.3em]" style="color:var(--txt-m)">Sample datasets to explore</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <template x-for="sample in samples" :key="sample.name">
+                            <div class="gc p-3.5 rounded-xl cursor-default relative overflow-hidden" style="opacity:.55">
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-[10px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">Upload your own CSV</span>
+                                </div>
+                                <div class="invisible">
+                                    <p class="text-xs font-bold" x-text="sample.name"></p>
+                                    <p class="text-[9px] font-medium mt-1" style="color:var(--txt-m)" x-text="sample.rows + ' · ' + sample.type"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ═══════════ FOOTER ═══ -->
+    <footer class="px-5 md:px-8 py-7 border-t mt-auto" style="border-color:var(--border)">
+        <div class="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-5">
+            <div class="flex items-center gap-3">
+                <svg class="w-4 h-4 text-[#1e9902] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 4.946-3.078 9.141-7.404 10.825L10 18l-.596-.234C5.078 16.082 2 11.886 2 7.001c0-.682.057-1.35.166-2.002zM10 4a1 1 0 100 2 1 1 0 000-2zm-1 8a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-widest" style="color:var(--txt)">Privacy First</p>
+                    <p class="text-[9px] uppercase" style="color:var(--txt-m)">Ephemeral · No persistent storage</p>
+                </div>
+            </div>
+            <span class="text-[10px] font-bold uppercase tracking-widest" style="color:var(--txt-m)">DataForge · Gemini 2.0 · FLAML AutoML</span>
+        </div>
+    </footer>
+
+    <script>
+    function uploadApp() {
+        return {
+            isDragging:   false,
+            fileUploaded: false,
+            isUploading:  false,
+            fileName:     '',
+            profile:      null,
+            errorMsg:     '',
+            darkMode:     true,
+            samples: [
+                { name:'Ecommerce Sales.csv',  rows:'14.2k', type:'Transactional' },
+                { name:'User Churn Meta.csv',  rows:'5.8k',  type:'Relational'   },
+                { name:'Stock_History_Q4.csv', rows:'220k',  type:'Time-Series'  },
+            ],
+
+            initTheme() {
+                const saved = localStorage.getItem('analyst-theme');
+                this.darkMode = saved !== 'light';
+                this.applyTheme();
+            },
+            toggleTheme() {
+                this.darkMode = !this.darkMode;
+                this.applyTheme();
+                localStorage.setItem('analyst-theme', this.darkMode ? 'dark' : 'light');
+            },
+            applyTheme() {
+                document.getElementById('html-root').classList.toggle('light', !this.darkMode);
+            },
+
+            async handleDrop(e) {
+                this.isDragging = false;
+                const file = e.dataTransfer.files[0];
+                if (file) await this.uploadFile(file);
+            },
+            async handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file) await this.uploadFile(file);
+            },
+            async uploadFile(file) {
+                if (!file.name.endsWith('.csv')) { this.errorMsg = 'Only CSV files are supported.'; return; }
+                this.errorMsg = ''; this.isUploading = true; this.fileName = file.name;
+                const fd = new FormData(); fd.append('file', file);
+                try {
+                    const res  = await fetch('/api/upload', {method:'POST', body:fd});
+                    const data = await res.json();
+                    if (!res.ok || data.error) { this.errorMsg = data.error || 'Upload failed.'; return; }
+                    this.profile = data.profile; this.fileUploaded = true;
+                } catch(err) { this.errorMsg = 'Network error: ' + err.message; }
+                finally { this.isUploading = false; }
+            },
+            goToWorkspace() { window.location.href = '/workspace'; },
+            reset() { this.fileUploaded = false; this.fileName = ''; this.profile = null; this.errorMsg = ''; },
+        }
+    }
+    </script>
+</body>
+</html>

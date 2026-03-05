@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataForge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <style>
+        /* ─── DARK (default) ────────────────────────────────────── */
+        :root {
+            --bg:        #050505;
+            --surface:   #0A0A0B;
+            --border:    #1A1A1C;
+            --accent:    #2E5BFF;
+            --glow:      rgba(46,91,255,0.15);
+            --txt:       #ffffff;
+            --txt-m:     #666666;
+            --txt-f:     #2e2e30;
+            --card:      rgba(10,10,11,0.75);
+            --nav:       rgba(5,5,5,0.92);
+            --inp-bg:    #0A0A0B;
+            --row-h:     rgba(255,255,255,0.03);
+            --row-head:  rgba(255,255,255,0.02);
+        }
+        /* ─── LIGHT ─────────────────────────────────────────────── */
+        html.light {
+            --bg:        #c8c8cd;
+            --surface:   #d1caca;
+            --border:    #e2e2e6;
+            --accent:    #08227e;
+            --glow:      rgba(46,91,255,0.08);
+            --txt:       #0a0a0b;
+            --txt-m:     #37373c;
+            --txt-f:     #d0d0d6;
+            --card:      #eae2e2e6;
+            --nav:       rgba(242,242,245,0.96);
+            --inp-bg:    #f8f8fb;
+            --row-h:     rgba(0,0,0,0.03);
+            --row-head:  rgba(0,0,0,0.015);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--txt);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .noise {
+            position: fixed; inset: 0; pointer-events: none; opacity: .035; z-index: 9999;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+        html.light .noise { opacity: .015; }
+
+        .gc { background: var(--card); backdrop-filter: blur(20px); border: 1px solid var(--border); transition: border-color 0.2s, background 0.2s; }
+
+        /* ── Table ── */
+        .dt { width: 100%; border-collapse: collapse; font-size: .72rem; }
+        .dt th { padding: 10px 14px; text-align: left; font-weight: 700; font-size: .6rem; text-transform: uppercase; letter-spacing: .12em; color: var(--txt-m); border-bottom: 1px solid var(--border); background: var(--row-head); white-space: nowrap; position: sticky; top: 0; z-index: 2; }
+        .dt td { padding: 8px 14px; border-bottom: 1px solid var(--border); color: var(--txt-m); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+        .dt tbody tr:hover td { background: var(--row-h); color: var(--txt); }
+
+        /* scrollbars */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* ── Buttons ── */
+        .bp { background: var(--accent); color: #fff; font-weight: 700; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; padding: .6rem 1.3rem; border-radius: .6rem; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: .5rem; border: none; white-space: nowrap; flex-shrink: 0; }
+        .bp:hover { filter: brightness(1.12); transform: translateY(-1px); }
+        .bp:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+        .bg { background: transparent; border: 1px solid var(--border); color: var(--txt-m); font-weight: 700; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; padding: .6rem 1.2rem; border-radius: .6rem; cursor: pointer; transition: all .2s; white-space: nowrap; flex-shrink: 0; }
+        .bg:hover { border-color: var(--accent); color: var(--txt); }
+
+        /* ── Badges ── */
+        .bok  { display:inline-flex; align-items:center; gap:.4rem; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.2); color:#1e9902; font-size:.65rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.3rem .7rem; border-radius:999px; }
+        .bwrn { display:inline-flex; align-items:center; gap:.4rem; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.2); color:#f59e0b; font-size:.65rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.3rem .7rem; border-radius:999px; }
+
+        /* ── Misc ── */
+        .code-blk { background:#0d1117; border-radius:.5rem; padding:.75rem 1rem; font-family:monospace; font-size:.72rem; color:#1e9902; overflow-x:auto; margin-top:.5rem; white-space:pre; }
+        .lf { border-left: 3px solid var(--accent); }
+        .ld { border-left: 3px solid #ef4444; }
+        [x-cloak] { display: none !important; }
+        .spin { animation: spin .8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Nav ── */
+        #topnav {
+            position: sticky; top: 0; z-index: 30;
+            background: var(--nav);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(16px);
+            height: 52px;
+            display: flex; align-items: center;
+            padding: 0 1.125rem; gap: 0;
+            transition: background 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+        .ntab { padding: .38rem .85rem; border-radius: .45rem; font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--txt-m); transition: all .15s; cursor: pointer; background: transparent; border: none; white-space: nowrap; }
+        .ntab:hover { color: var(--txt); }
+        .ntab.na { background: rgba(255,255,255,0.09); color: var(--txt); }
+        html.light .ntab.na { background: rgba(46,91,255,0.1); color: var(--accent); }
+
+        /* icon buttons */
+        .ibt { width: 32px; height: 32px; border-radius: .45rem; border: 1px solid var(--border); background: transparent; cursor: pointer; color: var(--txt-m); display: flex; align-items: center; justify-content: center; transition: border-color .15s, color .15s; flex-shrink: 0; }
+        .ibt:hover { border-color: var(--accent); color: var(--txt); }
+
+        /* ── Drawer ── */
+        #dov { position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); z-index: 40; }
+        #dpn { position: fixed; top: 0; right: 0; bottom: 0; width: 260px; max-width: 85vw; background: var(--surface); border-left: 1px solid var(--border); z-index: 50; display: flex; flex-direction: column; padding: 1.25rem; transition: transform .25s cubic-bezier(.4,0,.2,1), background 0.2s; }
+        #dpn.dc { transform: translateX(100%); }
+        #dpn.do { transform: translateX(0); }
+
+        .dtab { display: flex; align-items: center; gap: .75rem; padding: .65rem .875rem; border-radius: .5rem; font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--txt-m); background: transparent; border: none; cursor: pointer; transition: all .15s; width: 100%; text-align: left; }
+        .dtab:hover { background: var(--border); color: var(--txt); }
+        .dtab.na { background: rgba(46,91,255,.12); color: var(--accent); }
+
+        /* ── Stat card ── */
+        .sc { background: var(--card); border: 1px solid var(--border); border-radius: .875rem; padding: .875rem 1rem; transition: background 0.2s, border-color 0.2s; }
+
+        /* ── Quality bar ── */
+        .qbg { height: 3px; width: 100%; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .qbf { height: 100%; border-radius: 99px; transition: width .4s; }
+
+        /* ── Input ── */
+        .inp { background: var(--inp-bg); border: 1px solid var(--border); border-radius: .5rem; padding: .5rem .75rem; color: var(--txt); font-family: inherit; font-size: .85rem; outline: none; transition: border-color .15s; width: 100%; }
+        .inp:focus { border-color: var(--accent); }
+        .inp::placeholder { color: var(--txt-m); }
+        textarea.inp { resize: vertical; }
+
+        /* ── EDA iframe ── */
+        #eda-frame { width: 100%; border: none; border-radius: .75rem; height: calc(100vh - 130px); min-height: 500px; background: var(--bg); }
+
+        /* ── Live dot ── */
+        .ld2 { width: 8px; height: 8px; border-radius: 50%; background: #05e62e; box-shadow: 0 0 6px #05e62e; animation: ld2 2s ease-in-out infinite; }
+        @keyframes ld2 { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+        /* ── Sec label ── */
+        .sl { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--txt-m); }
+
+        /* chat user bubble */
+        .cub { background: rgba(46,91,255,.1); border: 1px solid rgba(46,91,255,.18); }
+        html.light .cub { background: rgba(46,91,255,.07); border-color: rgba(46,91,255,.15); }
+    </style>
+</head>
+
+<body x-data="workspaceApp()" x-init="init()" x-cloak>
+<div class="noise"></div>
+
+<!-- ═══════════════════════════════════ NAV ═══ -->
+<nav id="topnav">
+    <a href="/" class="flex items-center gap-2.5 flex-shrink-0 no-underline">
+        <div class="w-7 h-7 flex items-center justify-center rounded-sm flex-shrink-0" style="background:var(--txt)">
+            <div class="w-3.5 h-3.5 rotate-45" style="background:var(--bg)"></div>
+        </div>
+        <span class="font-black text-[11px] tracking-widest uppercase hidden sm:block" style="color:var(--txt)">DataForge </span>
+    </a>
+
+    <div class="w-px h-5 mx-4 flex-shrink-0" style="background:var(--border)"></div>
+
+    <!-- Desktop tabs -->
+    <div class="hidden md:flex items-center gap-0.5">
+        <template x-for="tab in tabs" :key="tab.id">
+            <button @click="activeTab = tab.id" :class="activeTab === tab.id ? 'na' : ''" class="ntab" x-text="tab.label"></button>
+        </template>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <!-- Dataset info -->
+    <template x-if="profile">
+        <div class="hidden lg:flex items-center gap-2 mr-4 font-mono" style="font-size:.6rem; color:var(--txt-m)">
+            <span class="font-bold" style="color:var(--txt)" x-text="profile.filename || 'dataset.csv'"></span>
+            <span style="color:var(--txt-f)">·</span>
+            <span x-text="profile.rows.toLocaleString() + ' rows'"></span>
+            <span style="color:var(--txt-f)">·</span>
+            <span x-text="profile.cols + ' cols'"></span>
+            <template x-if="cleanProfile"><span class="bok ml-1">✓ Cleaned</span></template>
+        </div>
+    </template>
+
+    <!-- Engine live -->
+    <div class="hidden sm:flex items-center gap-1.5 mr-3 flex-shrink-0">
+        <div class="ld2"></div>
+        <span class="text-[#1e9902] font-bold text-[10px] uppercase tracking-tight">Engine Live</span>
+    </div>
+
+    <!-- Theme toggle -->
+    <button @click="toggleTheme()" class="ibt mr-2" title="Toggle theme">
+        <svg x-show="darkMode" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg x-show="!darkMode" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+
+    <!-- Hamburger -->
+    <button @click="drawerOpen = true" class="ibt md:hidden" aria-label="Menu">
+        <svg width="15" height="12" viewBox="0 0 15 12" fill="none" stroke="currentColor" stroke-width="1.6">
+            <line x1="0" y1="1" x2="15" y2="1"/><line x1="0" y1="6" x2="15" y2="6"/><line x1="0" y1="11" x2="15" y2="11"/>
+        </svg>
+    </button>
+</nav>
+
+<!-- ════════════════════════════ DRAWER ═══ -->
+<div x-show="drawerOpen" @click="drawerOpen = false" id="dov"
+     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"></div>
+
+<div :class="drawerOpen ? 'do' : 'dc'" id="dpn">
+    <div class="flex items-center justify-between mb-5">
+        <span class="sl">Navigation</span>
+        <button @click="drawerOpen = false" class="ibt">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+            </svg>
+        </button>
+    </div>
+    <nav class="flex flex-col gap-1">
+        <template x-for="tab in tabs" :key="tab.id">
+            <button @click="activeTab = tab.id; drawerOpen = false" :class="activeTab === tab.id ? 'na' : ''" class="dtab">
+                <span x-text="tab.icon" class="text-base leading-none"></span>
+                <span x-text="tab.label"></span>
+            </button>
+        </template>
+    </nav>
+    <template x-if="profile">
+        <div class="mt-auto pt-4 border-t" style="border-color:var(--border)">
+            <p class="sl mb-1">Dataset</p>
+            <p class="font-bold text-xs truncate" style="color:var(--txt)" x-text="profile.filename || 'dataset.csv'"></p>
+            <div class="flex gap-3 mt-1 font-mono text-[10px]" style="color:var(--txt-m)">
+                <span x-text="profile.rows.toLocaleString() + ' rows'"></span>
+                <span>·</span>
+                <span x-text="profile.cols + ' cols'"></span>
+            </div>
+            <div class="flex items-center gap-1.5 mt-2">
+                <div class="ld2"></div>
+                <span class="text-[#1e9902] font-bold text-[10px] uppercase tracking-tight">Engine Live</span>
+            </div>
+        </div>
+    </template>
+</div>
+
+<!-- ════════════════════════════ CONTENT ═══ -->
+<main class="flex-1">
+
+    <!-- ── PREVIEW ───────────────────────────────────────── -->
+    <div x-show="activeTab === 'preview'" class="p-4 md:p-6 space-y-5">
+
+        <!-- ① Stats row (moved from sidebar) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <template x-if="profile">
+                <div class="contents">
+                    <div class="sc">
+                        <p class="sl mb-1">Rows</p>
+                        <p class="text-2xl font-black tracking-tighter" x-text="(cleanProfile || profile).rows.toLocaleString()"></p>
+                        <template x-if="cleanProfile"><p class="text-[10px] mt-0.5" style="color:var(--txt-m)">was <span style="color:#1e9902" x-text="profile.rows.toLocaleString()"></span></p></template>
+                    </div>
+                    <div class="sc">
+                        <p class="sl mb-1">Columns</p>
+                        <p class="text-2xl font-black tracking-tighter" x-text="(cleanProfile || profile).cols"></p>
+                        <p class="text-[10px] mt-0.5" style="color:var(--txt-m)" x-text="(cleanProfile || profile).numeric + ' numeric'"></p>
+                    </div>
+                    <div class="sc">
+                        <p class="sl mb-1">Missing</p>
+                        <p class="text-2xl font-black tracking-tighter" x-text="(cleanProfile || profile).missing_pct + '%'"></p>
+                        <p class="text-[10px] mt-0.5" style="color:var(--txt-m)" x-text="(cleanProfile || profile).missing.toLocaleString() + ' cells'"></p>
+                    </div>
+                    <div class="sc">
+                        <p class="sl mb-1">Quality</p>
+                        <p class="text-2xl font-black tracking-tighter" style="color:#1e9902" x-text="(100 - (cleanProfile || profile).missing_pct).toFixed(1) + '%'"></p>
+                        <p class="text-[10px] mt-0.5" style="color:var(--txt-m)">completeness</p>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- ② Schema (moved from sidebar) -->
+        <template x-if="profile && profile.columns">
+            <div class="gc rounded-2xl overflow-hidden">
+                <div class="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-2" style="border-color:var(--border)">
+                    <p class="sl">Column Schema</p>
+                    <div class="flex items-center gap-2">
+                        <template x-if="cleanProfile"><span class="bok">✓ Cleaned</span></template>
+                        <span class="font-mono text-[10px]" style="color:var(--txt-m)" x-text="(cleanProfile || profile).columns.length + ' columns'"></span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="dt">
+                        <thead><tr><th>Column</th><th>Type</th><th>Null %</th><th style="min-width:110px">Quality</th></tr></thead>
+                        <tbody>
+                            <template x-for="col in (cleanProfile || profile).columns" :key="col.name">
+                                <tr>
+                                    <td class="font-mono font-bold" style="color:var(--txt)" x-text="col.name"></td>
+                                    <td><span class="font-mono text-[10px] px-1.5 py-0.5 rounded" style="background:var(--border); color:var(--txt-m)" x-text="col.dtype.substring(0,10)"></span></td>
+                                    <td class="font-mono" x-text="col.null_pct + '%'"></td>
+                                    <td>
+                                        <div class="flex items-center gap-2">
+                                            <div class="qbg flex-1"><div class="qbf" :style="`width:${col.quality}%; background:${col.quality >= 90 ? '#1e9902' : col.quality >= 70 ? '#f59e0b' : '#ef4444'}`"></div></div>
+                                            <span class="font-mono text-[10px] w-8 text-right flex-shrink-0" style="color:var(--txt-m)" x-text="col.quality + '%'"></span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </template>
+
+        <!-- ③ Raw Feed -->
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <h2 class="text-2xl font-black uppercase tracking-tight" style="background:linear-gradient(135deg,var(--txt),var(--txt-m));-webkit-background-clip:text;-webkit-text-fill-color:transparent">Raw Feed</h2>
+            <div class="flex items-center gap-3 flex-wrap">
+                <template x-if="cleanProfile">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" x-model="previewClean" @change="loadPreview()" class="accent-[#2E5BFF]">
+                        <span class="font-bold uppercase tracking-widest text-[10px]" style="color:var(--txt-m)">Show cleaned</span>
+                    </label>
+                </template>
+                <div class="font-mono rounded px-2.5 py-1 text-[10px] font-bold" style="background:var(--border); color:var(--txt-m)" x-text="'LIMIT: ' + previewData.rows.length + ' ROWS'"></div>
+            </div>
+        </div>
+
+        <template x-if="previewData.headers.length">
+            <div class="gc rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="dt">
+                        <thead><tr>
+                            <template x-for="h in previewData.headers" :key="h"><th x-text="h"></th></template>
+                        </tr></thead>
+                        <tbody>
+                            <template x-for="(row, ri) in previewData.rows" :key="ri">
+                                <tr><template x-for="(cell, ci) in row" :key="ci"><td x-text="cell === null ? '—' : cell"></td></template></tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t flex justify-center" style="border-color:var(--border); background:var(--surface)">
+                    <button @click="loadPreview(500)" class="font-bold uppercase tracking-[.2em] text-[10px] hover:opacity-70 transition-opacity" style="color:var(--accent)">Load More Rows +</button>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="!previewData.headers.length">
+            <div class="flex items-center justify-center h-48 font-mono text-sm" style="color:var(--txt-m)">Loading preview…</div>
+        </template>
+    </div>
+
+    <!-- ── AI QUERY ──────────────────────────────────────── -->
+    <div x-show="activeTab === 'query'" class="p-4 md:p-6 flex flex-col gap-4" style="min-height:calc(100vh - 52px)">
+        <template x-if="!geminiOk">
+            <div class="p-4 rounded-xl" style="background:rgba(245,158,11,.07); border:1px solid rgba(245,158,11,.2)">
+                <p class="text-amber-400 font-bold text-sm">⚠ Gemini API key not configured</p>
+                <p class="text-xs mt-1" style="color:var(--txt-m)">Set <code class="text-amber-300">GEMINI_API_KEY</code> in your <code>.env</code> and restart.</p>
+            </div>
+        </template>
+
+        <div class="flex-1 overflow-y-auto space-y-6" id="chat-thread" style="min-height:280px">
+            <template x-for="(msg, i) in messages" :key="i">
+                <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                    <div :class="msg.role === 'user' ? 'max-w-[80%] cub p-4 rounded-2xl rounded-tr-none' : 'w-full max-w-4xl space-y-3'">
+                        <template x-if="msg.role === 'assistant'">
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black italic" style="background:var(--txt); color:var(--bg)">AI</div>
+                                <span class="font-bold uppercase tracking-widest text-[10px]" style="color:var(--txt-m)">Analyst Pipeline</span>
+                                <template x-if="msg.intent"><span class="text-[9px] font-mono px-2 py-0.5 rounded-full" style="color:var(--accent); background:rgba(46,91,255,.1)" x-text="msg.intent.type"></span></template>
+                            </div>
+                        </template>
+                        <p class="text-sm leading-relaxed" x-text="msg.content"></p>
+                        <template x-if="msg.chartData">
+                            <div class="mt-4 pt-4 border-t" style="border-color:var(--border)"><canvas :id="'chart-' + i" height="200"></canvas></div>
+                        </template>
+                        <template x-if="msg.tableData">
+                            <div class="mt-4 overflow-x-auto" style="max-height:260px">
+                                <table class="dt">
+                                    <thead><tr><template x-for="h in msg.tableData.headers" :key="h"><th x-text="h"></th></template></tr></thead>
+                                    <tbody>
+                                        <template x-for="(row, ri) in msg.tableData.rows.slice(0,50)" :key="ri">
+                                            <tr><template x-for="(cell, ci) in row" :key="ci"><td x-text="cell === null ? '—' : cell"></td></template></tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                                <p class="text-[9px] mt-2 text-center" style="color:var(--txt-m)" x-text="msg.tableData.rows.length > 50 ? '(showing 50 of ' + msg.tableData.total + ' rows)' : ''"></p>
+                            </div>
+                        </template>
+                        <template x-if="msg.insight">
+                            <p class="text-xs italic leading-relaxed mt-2 pl-3 border-l" style="color:var(--txt-m); border-color:rgba(46,91,255,.3)" x-text="'💡 ' + msg.insight"></p>
+                        </template>
+                        <template x-if="msg.code">
+                            <div x-data="{open:false}" class="mt-3">
+                                <button @click="open=!open" class="flex items-center gap-1.5 text-[9px] font-bold hover:opacity-70 transition-opacity" style="color:var(--txt-m)">
+                                    <svg :class="open?'rotate-90':''" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg>
+                                    VIEW GENERATED PYTHON
+                                </button>
+                                <div x-show="open" x-transition class="code-blk mt-2" x-text="msg.code"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+            <template x-if="isAnalyzing">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-2 h-2 rounded-full bg-[#2E5BFF] animate-pulse"></div>
+                    <div class="w-2 h-2 rounded-full bg-[#2E5BFF] animate-pulse" style="animation-delay:.15s"></div>
+                    <div class="w-2 h-2 rounded-full bg-[#2E5BFF] animate-pulse" style="animation-delay:.3s"></div>
+                    <span class="font-bold uppercase tracking-[.3em] text-[10px]" style="color:var(--txt-m)">Processing…</span>
+                </div>
+            </template>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            <template x-for="action in quickActions" :key="action">
+                <button @click="query = action; runQuery()" class="text-[10px] font-medium border rounded-full px-3 py-1.5 hover:border-[#2E5BFF] transition-all" style="border-color:var(--border); background:var(--card); color:var(--txt-m)" x-text="action" :disabled="isAnalyzing"></button>
+            </template>
+        </div>
+
+        <div class="gc rounded-2xl p-2 pr-4 flex items-end gap-3">
+            <textarea x-model="query" @keydown.enter.prevent="if(!$event.shiftKey) runQuery()" placeholder="Ask anything about your data… (Press Enter to send)" class="flex-1 bg-transparent text-sm py-3 px-4 resize-none min-h-[48px] max-h-40 font-light focus:outline-none" style="color:var(--txt)"></textarea>
+            <button @click="runQuery()" :disabled="isAnalyzing || !query.trim()" class="bp flex-shrink-0">
+                <template x-if="!isAnalyzing"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></template>
+                <template x-if="isAnalyzing"><svg class="w-4 h-4 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></template>
+            </button>
+        </div>
+    </div>
+
+    <!-- ── CLEANING ───────────────────────────────────────── -->
+    <div x-show="activeTab === 'cleaning'" class="p-4 md:p-6 space-y-6">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-tight">Data Cleaning</h2>
+                <p class="text-xs mt-1" style="color:var(--txt-m)">Auto-fix missing values · pyjanitor structural repair · Download cleaned CSV</p>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+                <button @click="runCleaning()" :disabled="isCleaning || !!cleanResult" class="bp">
+                    <template x-if="isCleaning"><svg class="w-4 h-4 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></template>
+                    <span x-text="isCleaning ? 'CLEANING…' : (cleanResult ? '✓ CLEANED' : 'RUN PIPELINE')"></span>
+                </button>
+                <template x-if="cleanResult"><a href="/api/clean/download" class="bg">⬇ DOWNLOAD CSV</a></template>
+            </div>
+        </div>
+
+        <template x-if="cleanError">
+            <div class="p-4 rounded-xl font-mono text-sm text-red-400" style="background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2)" x-text="cleanError"></div>
+        </template>
+
+        <template x-if="cleanResult">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="gc p-4 rounded-xl"><p class="sl">Original Rows</p><p class="text-2xl font-black tracking-tighter mt-1" x-text="cleanResult.stats.original_rows.toLocaleString()"></p></div>
+                <div class="gc p-4 rounded-xl"><p class="sl">Cleaned Rows</p><p class="text-2xl font-black tracking-tighter mt-1 text-emerald-400" x-text="cleanResult.stats.cleaned_rows.toLocaleString()"></p></div>
+                <div class="gc p-4 rounded-xl"><p class="sl">Original Cols</p><p class="text-2xl font-black tracking-tighter mt-1" x-text="cleanResult.stats.original_cols"></p></div>
+                <div class="gc p-4 rounded-xl"><p class="sl">Cleaned Cols</p><p class="text-2xl font-black tracking-tighter mt-1 text-emerald-400" x-text="cleanResult.stats.cleaned_cols"></p></div>
+            </div>
+        </template>
+
+        <template x-if="cleanResult && cleanResult.missing_log.length">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Missing Value Fixes</h3>
+                <div class="gc rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="dt">
+                            <thead><tr><th>Column</th><th>Missing</th><th>% Missing</th><th>Action</th></tr></thead>
+                            <tbody>
+                                <template x-for="row in cleanResult.missing_log" :key="row.column">
+                                    <tr :class="row.type === 'drop' ? 'ld' : 'lf'">
+                                        <td class="font-mono" style="color:var(--txt)" x-text="row.column"></td>
+                                        <td x-text="row.missing.toLocaleString()"></td>
+                                        <td x-text="row.pct_missing + '%'"></td>
+                                        <td x-text="row.action"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </template>
+        <template x-if="cleanResult && !cleanResult.missing_log.length"><span class="bok">✓ No missing values found</span></template>
+
+        <template x-if="cleanResult">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Structural Cleaning · pyjanitor</h3>
+                <div class="space-y-2">
+                    <template x-for="action in cleanResult.struct_actions" :key="action">
+                        <div class="flex items-center gap-3 text-sm" style="color:var(--txt)">
+    <svg 
+        class="w-4 h-4 flex-shrink-0"
+        style="color:#1e9902;"
+        fill="currentColor"
+        viewBox="0 0 20 20">
+        <path fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clip-rule="evenodd">
+        </path>
+    </svg>
+    <span x-text="action"></span>
+</div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template x-if="!cleanResult">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Raw Data Preview</h3>
+                <div class="gc rounded-xl overflow-hidden">
+                    <div class="overflow-x-auto" style="max-height:360px">
+                        <table class="dt">
+                            <thead><tr><template x-for="h in previewData.headers" :key="h"><th x-text="h"></th></template></tr></thead>
+                            <tbody>
+                                <template x-for="(row, ri) in previewData.rows.slice(0,20)" :key="ri">
+                                    <tr><template x-for="(cell,ci) in row" :key="ci"><td x-text="cell===null?'—':cell"></td></template></tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- ── EDA ───────────────────────────────────────────── -->
+    <div x-show="activeTab === 'eda'" class="p-4 md:p-6 flex flex-col gap-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-tight">EDA Report</h2>
+                <p class="text-xs mt-1" style="color:var(--txt-m)">ydata-profiling · Distribution · Correlation · Alerts</p>
+            </div>
+            <div class="flex gap-2 items-center flex-wrap">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" x-model="edaMinimal" class="accent-[#2E5BFF]">
+                    <span class="font-bold uppercase tracking-widest text-[10px]" style="color:var(--txt-m)">Minimal</span>
+                </label>
+                <select x-model="edaSampleN" class="inp" style="width:auto; padding:.4rem .7rem; font-size:.75rem; font-weight:700">
+                    <option value="1000">1k rows</option>
+                    <option value="5000" selected>5k rows</option>
+                    <option value="0">All rows</option>
+                </select>
+                <button @click="runEda()" :disabled="isGeneratingEda" class="bp">
+                    <template x-if="isGeneratingEda"><svg class="w-4 h-4 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></template>
+                    <span x-text="isGeneratingEda ? 'PROFILING…' : 'GENERATE REPORT'"></span>
+                </button>
+                <template x-if="edaReady"><a href="/api/eda/report" target="_blank" class="bg">⬇ REPORT</a></template>
+            </div>
+        </div>
+        <template x-if="edaError"><div class="p-4 rounded-xl font-mono text-sm text-red-400" style="background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2)" x-text="edaError"></div></template>
+        <template x-if="isGeneratingEda">
+            <div class="flex flex-col items-center justify-center gap-4 py-20">
+                <div class="w-12 h-12 border-2 border-t-transparent rounded-full animate-spin" style="border-color:var(--accent); border-top-color:transparent"></div>
+                <p class="font-mono uppercase tracking-widest text-sm" style="color:var(--txt-m)">Profiling dataset… 30–60s</p>
+            </div>
+        </template>
+        <template x-if="edaReady && !isGeneratingEda">
+            <iframe id="eda-frame" src="/api/eda/report" title="EDA Report"></iframe>
+        </template>
+        <template x-if="!edaReady && !isGeneratingEda">
+            <div class="flex flex-col items-center justify-center gap-4 py-20 text-center">
+                <div class="w-20 h-20 rounded-full flex items-center justify-center" style="background:rgba(46,91,255,.08)">
+                    <svg class="w-10 h-10" style="color:var(--accent)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                </div>
+                <p class="text-sm max-w-xs" style="color:var(--txt-m)">Click "Generate Report" to run a full exploratory data analysis with distributions, correlations, and quality alerts.</p>
+            </div>
+        </template>
+    </div>
+
+    <!-- ── AUTOML ─────────────────────────────────────────── -->
+    <div x-show="activeTab === 'automl'" class="p-4 md:p-6 space-y-6">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-2xl md:text-3xl font-black uppercase tracking-tight">AutoML</h2>
+                <p class="text-xs mt-1" style="color:var(--txt-m)">FLAML · Auto-detect task · Leaderboard · Model export</p>
+            </div>
+            <template x-if="automlResult"><a href="/api/automl/download" class="bg">⬇ DOWNLOAD MODEL (.pkl)</a></template>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="sl block mb-2">Target Column</label>
+                <select x-model="automlTarget" @change="detectTask()" class="inp">
+                    <option value="">— select target —</option>
+                    <template x-if="profile">
+                        <template x-for="col in profile.columns" :key="col.name">
+                            <option :value="col.name" x-text="col.name"></option>
+                        </template>
+                    </template>
+                </select>
+                <template x-if="detectedTask">
+                    <p class="text-[10px] mt-1.5" style="color:var(--txt-m)">Auto-detected: <span class="font-bold" style="color:var(--txt)" x-text="detectedTask"></span> · <span x-text="detectedNUnique + ' unique values'"></span></p>
+                </template>
+            </div>
+            <div>
+                <label class="sl block mb-2">Task Type</label>
+                <select x-model="automlTask" class="inp">
+                    <option value="auto-detect">Auto-detect</option>
+                    <option value="classification">Classification</option>
+                    <option value="regression">Regression</option>
+                </select>
+            </div>
+            <div>
+                <label class="sl block mb-2">Time Budget: <span x-text="automlTimeBudget + 's'"></span></label>
+                <input type="range" x-model="automlTimeBudget" min="30" max="600" step="30" class="w-full accent-[#2E5BFF]">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-6 flex-wrap">
+            <div class="flex items-center gap-3">
+                <label class="sl">Test Split: <span x-text="automlTestSize + '%'"></span></label>
+                <input type="range" x-model="automlTestSize" min="10" max="40" step="5" class="accent-[#2E5BFF] w-32">
+            </div>
+            <button @click="runAutoml()" :disabled="isTraining || !automlTarget" class="bp">
+                <template x-if="isTraining"><svg class="w-4 h-4 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></template>
+                <span x-text="isTraining ? 'TRAINING FLAML…' : '▶ TRAIN AUTOML'"></span>
+            </button>
+        </div>
+
+        <template x-if="automlError"><div class="p-4 rounded-xl font-mono text-sm text-red-400" style="background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2)" x-text="automlError"></div></template>
+
+        <template x-if="automlResult">
+            <div class="space-y-6">
+                <div class="p-4 rounded-xl" style="background:rgba(46,91,255,.06); border:1px solid rgba(46,91,255,.2)">
+                    <p class="font-bold uppercase tracking-widest text-[9px] mb-1" style="color:var(--accent)">Best Estimator</p>
+                    <p class="text-xl font-black" x-text="automlResult.best_estimator"></p>
+                    <p class="text-[10px] mt-1" style="color:var(--txt-m)">Val loss: <span class="font-mono" style="color:var(--txt)" x-text="automlResult.best_loss"></span> · Trained in <span class="font-mono" style="color:var(--txt)" x-text="automlResult.elapsed_s + 's'"></span></p>
+                </div>
+
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Test Set Metrics</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <template x-for="[k, v] in Object.entries(automlResult.metrics)" :key="k">
+                            <div class="gc p-4 rounded-xl"><p class="sl" x-text="k"></p><p class="text-2xl font-black tracking-tighter mt-1" style="color:var(--accent)" x-text="v"></p></div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Model Leaderboard</h3>
+                    <div class="gc rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="dt">
+                                <thead><tr><th>Model</th><th>Val Loss</th><th>Best Config</th></tr></thead>
+                                <tbody>
+                                    <template x-for="row in automlResult.leaderboard" :key="row.model">
+                                        <tr :class="row.best ? 'lf' : ''">
+                                            <td>
+                                                <template x-if="row.best"><span class="text-amber-400 mr-1"></span></template>
+                                                <span class="font-mono font-bold" :style="row.best ? 'color:var(--accent)' : 'color:var(--txt)'" x-text="row.model"></span>
+                                            </td>
+                                            <td class="font-mono" x-text="row.metric ?? '—'"></td>
+                                            <td class="font-mono text-[10px]" style="max-width:200px; overflow:hidden; text-overflow:ellipsis" x-text="row.best_config ?? '—'"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <template x-if="automlResult.feature_importance.length">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-widest mb-3" style="color:var(--txt-m)">Feature Importance (Top 15)</h3>
+                        <div class="space-y-2">
+                            <template x-for="fi in automlResult.feature_importance" :key="fi.feature">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-mono w-36 flex-shrink-0 truncate" style="color:var(--txt)" x-text="fi.feature"></span>
+                                    <div class="flex-1 h-2 rounded-full overflow-hidden" style="background:var(--border)">
+                                        <div class="h-full rounded-full" style="background:var(--accent)" :style="`width:${(fi.importance / automlResult.feature_importance[0].importance * 100).toFixed(1)}%`"></div>
+                                    </div>
+                                    <span class="text-[10px] font-mono w-20 text-right flex-shrink-0" style="color:var(--txt-m)" x-text="fi.importance.toFixed(4)"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+
+</main>
+
+<footer class="flex-shrink-0 px-5 py-2.5 border-t flex justify-between items-center flex-wrap gap-3" style="border-color:var(--border); background:var(--nav); font-size:.6rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--txt-m)">
+    <span>FLAML · PyJanitor · ydata-profiling · Gemini 2.0</span>
+    <span class="text-[#1e9902] font-bold text-[10px] uppercase tracking-tight">Open Source</span>
+</footer>
+
+<script>
+function workspaceApp() {
+    return {
+        activeTab: 'preview',
+        tabs: [
+            { id:'preview',  label:'Preview',     },
+            { id:'query',    label:'AI Query',    },
+            { id:'cleaning', label:'Cleaning',    },
+            { id:'eda',      label:'EDA Report',  },
+            { id:'automl',   label:'AutoML',     },
+        ],
+        profile:      {{ profile | tojson }},
+        cleanProfile: null,
+        geminiOk:     {{ gemini_ok | tojson }},
+        darkMode:     true,
+        drawerOpen:   false,
+
+        previewData:  {headers:[], rows:[]},
+        previewClean: false,
+
+        query: '', isAnalyzing: false, messages: [],
+        quickActions: ['Summarize this dataset','Distribution of numeric columns','Top 10 categories by count','Show correlation between numeric columns'],
+
+        isCleaning: false, cleanResult: null, cleanError: '',
+        isGeneratingEda: false, edaReady: false, edaError: '', edaMinimal: true, edaSampleN: 5000,
+        isTraining: false, automlResult: null, automlError: '',
+        automlTarget: '', automlTask: 'auto-detect', automlTimeBudget: 120, automlTestSize: 20,
+        detectedTask: '', detectedNUnique: 0,
+
+        async init() {
+            const saved = localStorage.getItem('analyst-theme');
+            this.darkMode = saved !== 'light';
+            this.applyTheme();
+            await this.loadPreview(200);
+            const pr = await fetch('/api/profile').then(r => r.json());
+            if (pr.cleaned) { this.cleanProfile = pr.cleaned; this.profile = pr.raw || this.profile; }
+        },
+
+    toggleTheme() {
+    this.darkMode = !this.darkMode;
+    this.applyTheme();
+    const t = this.darkMode ? 'dark' : 'light';
+    localStorage.setItem('analyst-theme', t);
+    // Reload iframe with new theme param — guaranteed race-free
+    const iframe = document.getElementById('eda-frame');
+    if (iframe && iframe.src && iframe.src.includes('/api/eda/report')) {
+        iframe.src = '/api/eda/report?t=' + Date.now() + '&theme=' + t;
+    }
+},
+
+    applyTheme() {
+            document.getElementById('html-root').classList.toggle('light', !this.darkMode);
+        },
+
+        async loadPreview(limit = 200) {
+            const url = `/api/preview?limit=${limit}${this.previewClean && this.cleanProfile ? '&clean=true' : ''}`;
+            this.previewData = await fetch(url).then(r => r.json());
+        },
+
+        async runQuery() {
+            const q = this.query.trim();
+            if (!q || this.isAnalyzing) return;
+            this.messages.push({role:'user', content: q});
+            this.query = ''; this.isAnalyzing = true;
+            this.$nextTick(() => this.scrollChat());
+            try {
+                const res  = await fetch('/api/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({query: q})});
+                const data = await res.json();
+                if (data.error) { this.messages.push({role:'assistant', content:'⚠ Error: ' + data.error}); }
+                else {
+                    const r = data.result;
+                    let msg = {role:'assistant', content:'', insight:data.insight, code:data.code, intent:data.intent};
+                    if (r.type === 'metric')        msg.content = `Result: ${r.value}`;
+                    else if (r.type === 'summary')  msg.content = r.text;
+                    else if (r.type === 'table')    { msg.content = `Found ${r.total} rows:`; msg.tableData = r; }
+                    else if (['bar_chart','line_chart','histogram'].includes(r.type)) { msg.content = `${r.x_label} vs ${r.y_label}`; msg.chartData = r; }
+                    else if (r.type === 'scatter_chart') { msg.content = `${r.x_label} vs ${r.y_label} (${r.points.length} points)`; msg.chartData = r; }
+                    else msg.content = JSON.stringify(r).substring(0, 200);
+                    this.messages.push(msg);
+                    if (msg.chartData) { const idx = this.messages.length - 1; this.$nextTick(() => this.renderChart(idx, msg.chartData)); }
+                }
+            } catch(e) { this.messages.push({role:'assistant', content:'Network error: ' + e.message}); }
+            finally { this.isAnalyzing = false; this.$nextTick(() => this.scrollChat()); }
+        },
+
+        scrollChat() { const el = document.getElementById('chat-thread'); if (el) el.scrollTop = el.scrollHeight; },
+
+        renderChart(idx, data) {
+            const canvas = document.getElementById('chart-' + idx);
+            if (!canvas) return;
+            const gc = this.darkMode ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.06)';
+            const tc = this.darkMode ? '#666' : '#999';
+            const ctx = canvas.getContext('2d');
+            const opts = { plugins:{legend:{labels:{color:tc,font:{size:10}}}}, scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:gc}},y:{ticks:{color:tc,font:{size:10}},grid:{color:gc}}} };
+            if (data.type === 'scatter_chart') { new Chart(ctx, {type:'scatter', data:{datasets:[{data:data.points, backgroundColor:'rgba(46,91,255,.6)', pointRadius:4}]}, options:{...opts}}); }
+            else { const t = data.type === 'line_chart' ? 'line' : 'bar'; new Chart(ctx, {type:t, data:{labels:data.labels, datasets:[{label:data.y_label, data:data.values, backgroundColor:t==='bar'?'rgba(46,91,255,.7)':'rgba(46,91,255,.2)', borderColor:'#2E5BFF', borderWidth:t==='line'?2:0, tension:.3, fill:t==='line'}]}, options:{...opts}}); }
+        },
+
+        async runCleaning() {
+            this.isCleaning = true; this.cleanError = '';
+            try {
+                const res = await fetch('/api/clean', {method:'POST'});
+                const data = await res.json();
+                if (data.error) { this.cleanError = data.error; return; }
+                this.cleanResult = data; this.cleanProfile = data.clean_profile;
+                this.previewClean = true; await this.loadPreview(200);
+            } catch(e) { this.cleanError = 'Network error: ' + e.message; }
+            finally { this.isCleaning = false; }
+        },
+
+        async runEda() {
+    this.isGeneratingEda = true; this.edaError = '';
+    try {
+        const res = await fetch('/api/eda', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({minimal: this.edaMinimal, sample_n: parseInt(this.edaSampleN)})
+        });
+        const data = await res.json();
+        if (data.error) { this.edaError = data.error; return; }
+        this.edaReady = true;
+        this.$nextTick(() => {
+            const f = document.getElementById('eda-frame');
+            if (f) {
+                const theme = this.darkMode ? 'dark' : 'light';
+                // Bake theme into URL — iframe reads it synchronously at parse time,
+                // so Bootstrap never gets a chance to flash white.
+                f.src = '/api/eda/report?t=' + Date.now() + '&theme=' + theme;
+            }
+        });
+    } catch(e) { this.edaError = 'Network error: ' + e.message; }
+    finally { this.isGeneratingEda = false; }
+},
+        async detectTask() {
+            if (!this.automlTarget) return;
+            try {
+                const res = await fetch('/api/automl/detect-task', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target_col:this.automlTarget})});
+                const data = await res.json();
+                this.detectedTask = data.task; this.detectedNUnique = data.n_unique;
+            } catch(e) {}
+        },
+
+        async runAutoml() {
+            if (!this.automlTarget) return;
+            this.isTraining = true; this.automlError = ''; this.automlResult = null;
+            try {
+                const res = await fetch('/api/automl/train', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target_col:this.automlTarget, task_choice:this.automlTask, time_budget:parseInt(this.automlTimeBudget), test_size:parseInt(this.automlTestSize)})});
+                const data = await res.json();
+                if (data.error) { this.automlError = data.error; return; }
+                this.automlResult = data;
+            } catch(e) { this.automlError = 'Network error: ' + e.message; }
+            finally { this.isTraining = false; }
+        },
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+flask>=3.0.0
+python-dotenv>=1.0.0
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# AI
+google-genai>=1.0.0
+
+# Cleaning
+pyjanitor>=0.28.0
+
+# EDA
+ydata-profiling>=4.6.0
+
+# AutoML
+flaml[default]>=2.1.0
+
+# Optional: faster session storage
+# flask-session>=0.6.0
